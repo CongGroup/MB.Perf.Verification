@@ -1,0 +1,137 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="click">
+      <UniqueIdentifier>{18c78241-1188-42fa-a04e-7050e53dbb3b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="res">
+      <UniqueIdentifier>{96fd7238-34e1-4888-8be7-a7dc1cf763be}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="lib">
+      <UniqueIdentifier>{b4f5b701-2d54-430a-bba4-bffcccbfe720}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="element">
+      <UniqueIdentifier>{e2421b2c-66ba-4e15-a7fe-efbff0db4b0c}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\Makefile">
+      <Filter>res</Filter>
+    </None>
+    <None Include="click_config\empty.click">
+      <Filter>click</Filter>
+    </None>
+    <None Include="click_config\boxfw.click">
+      <Filter>click</Filter>
+    </None>
+    <None Include="click_config\boxids.click">
+      <Filter>click</Filter>
+    </None>
+    <None Include="click_config\boxlb.click">
+      <Filter>click</Filter>
+    </None>
+    <None Include="click_config\gateway1.click">
+      <Filter>click</Filter>
+    </None>
+    <None Include="click_config\gateway2.click">
+      <Filter>click</Filter>
+    </None>
+    <None Include="click_config\gatewayr.click">
+      <Filter>click</Filter>
+    </None>
+    <None Include="src\libverimb\Makefile">
+      <Filter>lib</Filter>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="src\element\middleboxLB.cc">
+      <Filter>element</Filter>
+    </ClCompile>
+    <ClCompile Include="src\element\middleboxFW.cc">
+      <Filter>element</Filter>
+    </ClCompile>
+    <ClCompile Include="src\element\middleboxIDS.cc">
+      <Filter>element</Filter>
+    </ClCompile>
+    <ClCompile Include="src\element\gatewaySender.cc">
+      <Filter>element</Filter>
+    </ClCompile>
+    <ClCompile Include="src\element\veritools.cc">
+      <Filter>element</Filter>
+    </ClCompile>
+    <ClCompile Include="src\libverimb\merkle_tree.cc">
+      <Filter>lib</Filter>
+    </ClCompile>
+    <ClCompile Include="src\libverimb\pattern_loader.cc">
+      <Filter>lib</Filter>
+    </ClCompile>
+    <ClCompile Include="src\libverimb\pm_adaptor.cc">
+      <Filter>lib</Filter>
+    </ClCompile>
+    <ClCompile Include="src\libverimb\veri_header.cc">
+      <Filter>lib</Filter>
+    </ClCompile>
+    <ClCompile Include="src\libverimb\dfc\dfc.cc">
+      <Filter>lib</Filter>
+    </ClCompile>
+    <ClCompile Include="src\libverimb\dfc\dfc_adaptor.cc">
+      <Filter>lib</Filter>
+    </ClCompile>
+    <ClCompile Include="src\libverimb\ac\ac_adaptor.cc">
+      <Filter>lib</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="src\element\middleboxLB.hh">
+      <Filter>element</Filter>
+    </ClInclude>
+    <ClInclude Include="src\element\element_config.h">
+      <Filter>element</Filter>
+    </ClInclude>
+    <ClInclude Include="src\element\middleboxFW.hh">
+      <Filter>element</Filter>
+    </ClInclude>
+    <ClInclude Include="src\element\middleboxIDS.hh">
+      <Filter>element</Filter>
+    </ClInclude>
+    <ClInclude Include="src\element\gatewaySender.hh">
+      <Filter>element</Filter>
+    </ClInclude>
+    <ClInclude Include="src\element\veritools.hh">
+      <Filter>element</Filter>
+    </ClInclude>
+    <ClInclude Include="src\libverimb\merkle_tree.h">
+      <Filter>lib</Filter>
+    </ClInclude>
+    <ClInclude Include="src\libverimb\pattern_loader.h">
+      <Filter>lib</Filter>
+    </ClInclude>
+    <ClInclude Include="src\libverimb\pkt_reader.h">
+      <Filter>lib</Filter>
+    </ClInclude>
+    <ClInclude Include="src\libverimb\pm_adaptor.h">
+      <Filter>lib</Filter>
+    </ClInclude>
+    <ClInclude Include="src\libverimb\veri_header.h">
+      <Filter>lib</Filter>
+    </ClInclude>
+    <ClInclude Include="src\libverimb\dfc\dfc.h">
+      <Filter>lib</Filter>
+    </ClInclude>
+    <ClInclude Include="src\libverimb\dfc\dfc_adaptor.h">
+      <Filter>lib</Filter>
+    </ClInclude>
+    <ClInclude Include="src\libverimb\dfc\dfc_framework.h">
+      <Filter>lib</Filter>
+    </ClInclude>
+    <ClInclude Include="src\libverimb\ac\ac_adaptor.h">
+      <Filter>lib</Filter>
+    </ClInclude>
+    <ClInclude Include="src\libverimb\ac\aho_corasick.h">
+      <Filter>lib</Filter>
+    </ClInclude>
+    <ClInclude Include="src\libverimb\SimConHash.h">
+      <Filter>lib</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>
