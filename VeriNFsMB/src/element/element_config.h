@@ -46,11 +46,6 @@ const char *const  azureDstMac = "12:34:56:78:9a:bc";
 #define gateway1_dst_ip   ip_verm_2
 #define gateway1_dst_mac mac_verm_2
 
-#define boxLB_src_ip      ip_verm_2
-#define boxLB_src_mac    mac_verm_2
-#define boxLB_dst_ip      ip_verm_1
-#define boxLB_dst_mac    mac_verm_1
-
 #define boxFW_src_ip      ip_verm_2
 #define boxFW_src_mac    mac_verm_2
 #define boxFW_dst_ip      ip_verm_1
@@ -61,17 +56,28 @@ const char *const  azureDstMac = "12:34:56:78:9a:bc";
 #define boxIDS_dst_ip     ip_verm_1
 #define boxIDS_dst_mac   mac_verm_1
 
+#define boxLB_src_ip      ip_verm_2
+#define boxLB_src_mac    mac_verm_2
+#define boxLB_dst_ip      ip_verm_1
+#define boxLB_dst_mac    mac_verm_1
+
+
 #define gateway2_src_ip   ip_verm_2
 #define gateway2_src_mac mac_verm_2
 #define gateway2_dst_ip   ip_verm_1
 #define gateway2_dst_mac mac_verm_1
 
-const bool justSend				= false;
-const bool localMode			= true;
-const bool veriSwitch			= true;
-const bool batchBasedPkt		= false;
-const int  batch_element_size	= 1024;
-const int  maxPktUsed			= 40960-200;
+// send pkt and disable middlebox function
+//const bool justSend				= false;
+//// test middlebox function without network
+//const bool localMode			= true;
+//// enable/disable verify
+//const bool veriSwitch			= false;
+//
+//const bool bothway = false;
+//
+//const int  batch_element_size	= 1024;
+//const int  maxPktUsed			= 1024 *10 *10 + 200;
 
 const int  ether_max_size		= 1514;
 
@@ -80,10 +86,9 @@ const int ip_default_len		= 20;
 const int tcp_default_len		= 20;
 const int udp_default_len		= 8;
 
-const bool samplePktLB			= false;
-const bool sampleLB				= true;
-const bool sampleFW				= false;
-const bool sampleIDS			= false;
+//const bool sampleLB				= false;
+//const bool sampleFW				= false;
+//const bool sampleIDS			    = false;
 
 const unsigned short srcPort	= 12345;
 const unsigned short dstPost	= 54321;
@@ -105,5 +110,15 @@ const char* const pktOutputPath		= "pktLog";
 const char* const outputExtension	= ".csv";
 const bool verbose = false;
 
+// the random number to combine flow`s pkts veri.
+const int randomSeed = trickFlowID;
+
+// if one box is in the chain, it need to receive per middlebox root pkt, then send it root
+// otherwise, it send the root when it receive batch size pkt.
+//const bool lbInTheChain = true;
+//const bool fwInTheChain = false;
+//const bool idsInTheChain = true;
+
+// output counter per 1s
 const int elementCounterBaseGap = 1000000000;
 

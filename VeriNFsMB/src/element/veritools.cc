@@ -5,6 +5,7 @@
 #include <clicknet/udp.h>
 #include <clicknet/ether.h>
 #include <sstream>
+#include <stdlib.h>
 
 #include <arpa/inet.h>
 
@@ -100,14 +101,14 @@ void VeriTools::showPacket(Packet * p)
 	}
 }
 
-uint64_t VeriTools::getPktID(uint32_t flowID, uint32_t cNum)
+uint32_t VeriTools::getPktID(uint16_t flowID, uint16_t cNum)
 {
-	return ((uint64_t)flowID) << 32 | cNum;
+	return ((uint16_t)flowID) << 16 | cNum;
 }
 
-tuple<uint32_t, uint32_t> VeriTools::divideID(uint64_t pktID)
+tuple<uint16_t, uint16_t> VeriTools::divideID(uint32_t pktID)
 {
-	return std::make_tuple<uint32_t, uint32_t>(pktID>>32, pktID&0xffffffff);
+	return std::make_tuple<uint32_t, uint32_t>(pktID>>16, pktID&0xffff);
 }
 
 static uint8_t* dataMac(const char* strMac, const int strLeng)
@@ -236,8 +237,16 @@ std::string VeriTools::fiveTuple(pktFlow & flow)
 	// actually this func need FIVE tuple, but for exp. we use veri info 
 	// because the dstIP and port need modify to send packet to next packet
 
+	//if(!bothway)
 	return std::string().append((char*)&flow.batchID, sizeof(flow.batchID))
 		.append((char*)&flow.flowID, sizeof(flow.flowID));
+	//else
+	//{
+	//	pktFlow temp(flow);
+
+	//	return std::string().append((char*)&temp.batchID, sizeof(temp.batchID))
+	//		.append((char*)&temp.flowID, sizeof(temp.flowID));
+	//}
 
 	// return std::string().append(to_string(flow.protocol))
 	//	.append(inet_ntoa(srcAddr))
@@ -362,6 +371,7 @@ uint64_t VeriTools::sha5tup(pktFlow & flow, int len)
 
 void VeriTools::initBoxBatch(boxBatch & batch, uint32_t id, veriType v, boxType b)
 {
+	const int batch_element_size = 1024;
 	batch.batchID = id;
 	batch.batchSize = batch_element_size;
 	batch.typeV = v;
@@ -402,15 +412,16 @@ bool VeriTools::buildVeriTree(boxBatch & batch)
 		return false;
 	}
 
-	int hight = floor(log(leavesCount) / log(2) + 0.5);
-
 	std::vector<std::string> res;
 	for (auto it = veris.begin(); it != veris.end(); it++)
 	{
-		res.push_back(it->second.veriRes);
+		res.push_back(std::string((char*)&it->second.veriRes, sizeof(it->second.veriRes)));
 	}
 
-	batch.tree.buildtree(hight, res);
+	// 8 packets tree`s height is 4
+	int height = floor(log(leavesCount) / log(2) + 0.5) + 1;
+
+	batch.tree.buildtree(height, res);
 	return true;
 }
 
@@ -477,81 +488,40 @@ uint32_t VeriTools::processLB(Packet * p_in)
 	return *hash.Query((uint32_t)sha5tup(p_in, 32));
 }
 
-std::string VeriTools::fpktLB(Packet* p_in, veriInfo& veri)
+uint64_t VeriTools::updateFlowVeri(veriInfo & flow_veri, const veriInfoPkt & pktVeriResult, Packet* p_in)
+{
+	flow_veri.pktCount += 1;
+	flow_veri.veriRes.veriNum *= getVeriRandom(p_in);
+	flow_veri.veriRes.veriNum += pktVeriResult.veriNum;
+	return flow_veri.veriRes.veriNum;
+}
+
+uint64_t veriPkt(Packet* p_in, uint16_t fidleID, uint16_t ruleID)
 {
 	VeriHeader* pVeri = (VeriHeader*)PktReader(p_in).getIpOption();
-
-	veri.pktID = getPktID(pVeri->flowID, pVeri->cNum);
-	veri.field = 3;
-	veri.ruleID = 0;
-	uint32_t output = processLB(p_in);
-
-	string& res = veri.veriRes;
-	res.append((char*)&veri.pktID, sizeof(veri.pktID));
-	res.append((char*)&veri.field, sizeof(veri.field));
-	res.append((char*)&veri.ruleID, sizeof(veri.ruleID));
-	res.append((char*)&output, sizeof(output));
-
-	//veri.veriRes = encTools::SHA256(res);
-	return veri.veriRes;
+	veriInfoPkt veri;
+	veri.veriData.pktID = VeriTools::getPktID(pVeri->flowID, pVeri->cNum);
+	veri.veriData.fieldID = fidleID;
+	veri.veriData.ruleID = ruleID;
+	return veri.veriNum;
 }
 
 // flowID layer(3) ruleid(0) output(dstIP) pktMate
-std::string VeriTools::fflowLB(pktFlow& flow, veriInfo&veri)
+uint64_t VeriTools::fflowLB(Packet* p_in)
 {
-	veri.flowID = flow.flowID;
-	veri.field = 3;
-	veri.ruleID = 0;
-	uint32_t output = (uint32_t)sha5tup(flow, 32);
-
-	string& res = veri.veriRes;
-	res.append((char*)&veri.flowID, sizeof(veri.flowID));
-	res.append((char*)&veri.field, sizeof(veri.field));
-	res.append((char*)&veri.ruleID, sizeof(veri.ruleID));
-	res.append((char*)&output, sizeof(output));
-	res.append(veri.mateData);
-	
-	//veri.veriRes = encTools::SHA256(res);
-	return veri.veriRes;
+	return veriPkt(p_in, 3, 0);
 }
 
 // flowID layer(4) ruleid(0) dropFlag counter
-std::string VeriTools::fflowFW(pktFlow& flow, veriInfo & veri)
+uint64_t VeriTools::fflowFW(Packet* p_in)
 {
-	veri.flowID = flow.flowID;
-	veri.field = 4;
-	veri.ruleID = 0;
-	veri.veriOutput.append('0', sizeof(int));
-	veri.state = flow.packetCount;
-
-
-	string& res = veri.veriRes;
-	res.append((char*)&veri.flowID, sizeof(veri.flowID));
-	res.append((char*)&veri.field, sizeof(veri.field));
-	res.append((char*)&veri.ruleID, sizeof(veri.ruleID));
-	res.append(veri.veriOutput);
-	res.append((char*)&veri.state, sizeof(veri.state));
-
-	//veri.veriRes = encTools::SHA256(res);
-	return veri.veriRes;
+	return veriPkt(p_in, 4, 0);
 }
 
 // flowID layer(7) ruleID(0)  mate(pageload-length)
-std::string VeriTools::fflowIDS(pktFlow& flow, veriInfo & veri)
+uint64_t VeriTools::fflowIDS(Packet* p_in)
 {
-	veri.flowID = flow.flowID;
-	veri.field = 7;
-	veri.ruleID = 0;
-	veri.mateData = std::to_string(veri.pageLoadLength);
-
-	string& res = veri.veriRes;
-	res.append((char*)&veri.flowID, sizeof(veri.flowID));
-	res.append((char*)&veri.field, sizeof(veri.field));
-	res.append((char*)&veri.ruleID, sizeof(veri.ruleID));
-	res.append(veri.mateData.data(), veri.mateData.length());
-
-	//veri.veriRes = encTools::SHA256(res);
-	return veri.veriRes;
+	return veriPkt(p_in, 7, 0);
 }
 
 std::string VeriTools::setPktCounter(pktCounter & counter, Packet* p_ref)
@@ -586,6 +556,23 @@ std::string VeriTools::formatElementCounter(const elementCounter & counter)
 		<< to_string(counter.pktCount) << comma << to_string(counter.pktSize) << comma
 		<< to_string(counter.pktPageloadSize)<<endl;
 	return ss.str();
+}
+
+int VeriTools::getVeriRandom(Packet* p_in)
+{
+	static PktReader reader;
+	reader.attach(p_in);
+	string res =  encTools::SHA256(reader.getIpOption(), sizeof(VeriHeader));
+	return *((int*)res.data());
+	//static vector<int> orderRandom;
+	//int rNum = orderRandom.size()>0? *orderRandom.rbegin(): randomSeed;
+	//while (orderRandom.size() < loc + 1)
+	//{
+	//	srand(rNum);
+	//	rNum = rand();
+	//	orderRandom.push_back(rNum);
+	//}
+	//return orderRandom[loc-1];
 }
 
 void VeriTools::checkElementCounter(elementCounter & counter, std::string & preTime, std::vector<std::string>& eleContainer)

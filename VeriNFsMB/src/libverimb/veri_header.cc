@@ -9,6 +9,17 @@
 
 using std::string;
 
+std::string encTools::SHA256(uint8_t* str, int len)
+{
+	uint8_t const* pbData = (uint8_t const*)str;
+	unsigned int nDataLen = len;
+	uint8_t abDigest[CryptoPP::SHA256::DIGESTSIZE];
+
+	CryptoPP::SHA256().CalculateDigest(abDigest, pbData, nDataLen);
+
+	return string((char*)abDigest);
+}
+
 std::string encTools::SHA256(const std::string & data)
 {
 	uint8_t const* pbData = (uint8_t*)data.data();

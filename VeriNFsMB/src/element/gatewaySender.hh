@@ -42,6 +42,8 @@ protected:
 	std::unordered_map<std::string, pktFlow> flowFilter;
 	// key is verHeader
 	std::unordered_map<std::string, pktFlow> allFlows;
+	// key is verHeader
+	std::unordered_map<std::string, int> five_tuple_loolup_table;
 
 	std::string startTime1;
 	std::string startTime2;

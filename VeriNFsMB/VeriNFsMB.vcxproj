@@ -73,8 +73,11 @@
     <None Include="click_config\boxlb.click" />
     <None Include="click_config\empty.click" />
     <None Include="click_config\gateway1.click" />
-    <None Include="click_config\gateway2.click" />
     <None Include="click_config\gatewayr.click" />
+    <None Include="click_config\localfw.click" />
+    <None Include="click_config\localgateway1.click" />
+    <None Include="click_config\localids.click" />
+    <None Include="click_config\locallb.click" />
     <None Include="src\libverimb\Makefile" />
   </ItemGroup>
   <ItemGroup>

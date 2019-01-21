@@ -41,14 +41,55 @@ GatewaySender::~GatewaySender()
 {
 }
 
-int
-GatewaySender::configure(Vector<String> &conf, ErrorHandler* errh) {
 
+static int veriSwitch = true;
+static bool justSend = false;
+static bool localMode = false;
+static bool bothway = false;
+static int  batch_element_size = 1024;
+static int  maxPktUsed = 1024 * 10 * 10 + 200;
+static bool lbInTheChain = false;
+static bool fwInTheChain = false;
+static bool idsInTheChain = false;
+
+int
+GatewaySender::configure(Vector<String> &conf, ErrorHandler* errh)
+{
+
+	//if (Args(conf, errh)
+	//	.complete() < 0)
+	//{
+	//	return -1;
+	//}
+	// Parsing
+	int inChain;
 	if (Args(conf, errh)
-		.complete() < 0)
+		//.read_m("PATTERN_FILE", m_config.pattern_file)
+		.read_m("BATCH_SIZE", batch_element_size)
+		.read_m("EXP_SIZE", maxPktUsed)
+		.read_m("VERIFY", veriSwitch)
+		.read_m("DISABLE_NETWORK", localMode)
+		.read_m("BASELINE", justSend)
+		.read_m("QUEYR_TABLE", bothway)
+		.read_m("IN_CHAIN", inChain)
+		.complete() < 0 )
 	{
 		return -1;
 	}
+
+	if (inChain)
+	{
+		lbInTheChain  = true;
+		fwInTheChain  = true;
+		idsInTheChain = true;
+	}	
+	else
+	{
+		lbInTheChain  = false;
+		fwInTheChain  = false;
+		idsInTheChain = false;
+	}
+
 	return 0;
 }
 
@@ -56,14 +97,17 @@ int GatewaySender::initialize(ErrorHandler *errh)
 {
 	click_chatter("===============================================\n");
 	click_chatter("Batch size\t:\t%d\n", batch_element_size);
+	click_chatter("Packets count\t:\t%d\n", maxPktUsed);
+
 	click_chatter("Baseline test is %s\n", justSend ? "enable" : "disable");
 	click_chatter("Veri function is %s\n", veriSwitch ? "enable" : "disable");
-	click_chatter("Veri type     is %s\n", batchBasedPkt ? "pktBased" : "flowBased");
+	click_chatter("Local test is %s\n", localMode ? "enable" : "disable");
+	click_chatter("Query Table is %s\n", bothway ? "enable" : "disable");
+	click_chatter("Box in chain is %s\n", lbInTheChain ? "yes" : "no");
 
-	click_chatter("pktBased  LB  is %s\n", samplePktLB ? "enable" : "disable");
-	click_chatter("flowBased LB  is %s\n", sampleLB ? "enable" : "disable");
-	click_chatter("flowBased FW  is %s\n", sampleFW ? "enable" : "disable");
-	click_chatter("flowBased IDS is %s\n", sampleIDS ? "enable" : "disable");
+	//click_chatter("flowBased LB  is %s\n", sampleLB ? "enable" : "disable");
+	//click_chatter("flowBased FW  is %s\n", sampleFW ? "enable" : "disable");
+	//click_chatter("flowBased IDS is %s\n", sampleIDS ? "enable" : "disable");
 	click_chatter("===============================================\n");
 	std::string start = encTools::timeNow();
 	click_chatter("===============================================\n");
@@ -86,8 +130,6 @@ int GatewaySender::initialize(ErrorHandler *errh)
 	pkt1Container.reserve(maxPktUsed);
 	pkt2Container.reserve(maxPktUsed);
 
-	startTime1 = encTools::timeNow();
-	startTime2 = encTools::timeNow();
 	preTime1 = encTools::timeNow();
 	preTime2 = encTools::timeNow();
 	activityTime = encTools::timeNow();
@@ -101,6 +143,12 @@ int GatewaySender::initialize(ErrorHandler *errh)
 	for (int i = 0; i < maxPktUsed; i++)
 	{
 		pktCache[i] = new unsigned char[ether_max_size];
+	}
+
+	bool genData = false;
+	if (genData)
+	{
+
 	}
 
 	return 0;
@@ -133,8 +181,8 @@ void GatewaySender::push(int port, Packet * p_in)
 		//end flag
 		if (++totalPktCount > maxPktUsed)
 		{
-				p_in->kill();
-				return;
+			p_in->kill();
+			return;
 		}
 
 		if (justSend)
@@ -147,6 +195,36 @@ void GatewaySender::push(int port, Packet * p_in)
 			gateway1Counter.pktPageloadSize += PktReader(p_in).getDataLength();
 			VeriTools::checkElementCounter(gateway1Counter, preTime1, ele1Container);
 			return;
+		}
+
+		// 0. sample pkt
+		if (veriSwitch)
+		if (!bothway)
+		{
+			if (!VeriTools::isSample(p_in))
+			{
+				// if not sample, do nothing.
+				return;
+			}
+		}
+		else
+		{
+			// if enable bothway, look up table, and then sample this pkt;
+			string fiveTuple = VeriTools::fiveTuple(p_in);
+			auto iter = five_tuple_loolup_table.find(fiveTuple);
+			if (iter != five_tuple_loolup_table.end())
+			{
+				iter->second += 1;
+			}
+			else
+			{
+				if (!VeriTools::isSample(p_in))
+				{
+					// if not sample, do nothing.
+					return;
+				}
+				five_tuple_loolup_table[fiveTuple] = 0;
+			}
 		}
 
 		//get batch
@@ -177,40 +255,7 @@ void GatewaySender::push(int port, Packet * p_in)
 		currentBatch.packetCount++;
 
 		// 4. do veri or cache pkt
-		VeriTools::isSample(p);
-		if (pktCache == 0)
-		{
-			if (veriSwitch && samplePktLB)
-			{
-				veriInfo veri;
-				veri.typeV = pktBasedVerify;
-				veri.typeB = LB;
-				veri.pktID = VeriTools::getPktID(flow.flowID, flow.packetCount);
-				veri.field = 3;
-				veri.ruleID = 0;
-				VeriTools::fpktLB(p, veri);
-
-				currentBatch.veriPktLB.push_back(veri);
-			}
-			if (veriSwitch && sampleLB)
-			{
-				veriInfo& veri = currentBatch.veriFlowLB[flowKey];
-				if (veri.packetCount == 0)
-				{
-					veri.typeV = pktBasedVerify;
-					veri.typeB = LB;
-					veri.pktID = VeriTools::getPktID(flow.flowID, flow.packetCount);
-					veri.field = 3;
-					veri.ruleID = 0;
-					veri.packetCount++;
-					veri.mateData.assign(8, '0');
-				}
-				VeriTools::setPacketMate(p, veri.packetCount, veri.mateData);
-			}
-			if (veriSwitch && sampleFW) {}
-			if (veriSwitch && sampleIDS) {}
-		}
-		else
+		if (pktCache != 0)
 		{
 			memcpy(pktCache[totalPktCount - 1], p->data(), p->length());
 		}
@@ -230,6 +275,10 @@ void GatewaySender::push(int port, Packet * p_in)
 		currentBatch.r2s.push_back(R2());
 
 		activityTime = timeStr;
+		if (!startTime1.size())
+		{
+			startTime1 = timeStr;
+		}
 		pkt1Counter.timestamp = encTools::differTimeInNsec(startTime1.data(), timeStr.data());
 		startTime1 = timeStr;
 		pkt1Counter.processTime = encTools::differTimeInNsec(beginTime.data(), timeStr.data());
@@ -247,7 +296,7 @@ void GatewaySender::push(int port, Packet * p_in)
 		}
 
 		//7.handle batch end
-		if (batchBasedPkt)
+		if (false)
 		{
 			if (currentBatch.packetCount == currentBatch.batchSize)
 			{
@@ -266,22 +315,6 @@ void GatewaySender::push(int port, Packet * p_in)
 				WritablePacket* batchPkt = makeSpecialPkt(p, currentBatch.packetCount);
 				VeriTools::reDirectionPacket(batchPkt, gateway1_src_ip, gateway1_src_mac, gateway1_dst_ip, gateway1_dst_mac);
 				ready_packet.push_back(batchPkt);
-
-				if (pktCache == 0)
-				{
-					// 7.2 make flow veri res
-					if (veriSwitch &&sampleLB)
-					{
-						veriInfo& veri = currentBatch.veriFlowLB[flowKey];
-						VeriTools::fflowLB(flow, veri);
-					}
-					if (veriSwitch &&sampleFW) {}
-					if (veriSwitch &&sampleIDS) {}
-				}
-				else
-				{
-					//empty
-				}
 
 				// 7.3 save batch
 				gatewayBatch nextBatch;
@@ -387,23 +420,19 @@ void GatewaySender::push(int port, Packet * p_in)
 				{
 					gatewayBatch&batch = batches[i];
 
-					char* pRoot = (char*)reader.getData();
-					if (samplePktLB)
-					{
-						batch.rootPktLB.assign(pRoot, encTools::SHA256_len);
-						pRoot += encTools::SHA256_len;
-					}
-					if (sampleLB)
+					char* pRoot = (char*)reader.getData() + udp_default_len;
+
+					if (veriSwitch>0)
 					{
 						batch.rootFlowLB.assign(pRoot, encTools::SHA256_len);
 						pRoot += encTools::SHA256_len;
 					}
-					if (sampleFW)
+					if (veriSwitch>1)
 					{
 						batch.rootFlowFW.assign(pRoot, encTools::SHA256_len);
 						pRoot += encTools::SHA256_len;
 					}
-					if (sampleIDS)
+					if (veriSwitch>2)
 					{
 						batch.rootFlowIDS.assign(pRoot, encTools::SHA256_len);
 						pRoot += encTools::SHA256_len;
@@ -420,7 +449,7 @@ void GatewaySender::push(int port, Packet * p_in)
 		}
 
 		// sample
-		VeriTools::isSample(p_in);
+		//VeriTools::isSample(p_in);
 
 		bool __found = false;
 		for (int i = 0; i < batches.size(); i++)
@@ -446,6 +475,10 @@ void GatewaySender::push(int port, Packet * p_in)
 						//batch.counter.totalTime += diffTime;
 
 						activityTime = timeStr;
+						if (!startTime2.size())
+						{
+							startTime2 = timeStr;
+						}
 						pkt2Counter.timestamp = encTools::differTimeInNsec(startTime2.data(), timeStr.data());
 						startTime2 = timeStr;
 						pkt2Counter.processTime = encTools::differTimeInNsec(beginTime.data(), timeStr.data());
@@ -481,6 +514,7 @@ void GatewaySender::push(int port, Packet * p_in)
 		}
 		totalGateway2Time += encTools::differTimeInNsec(beginTime.data(), encTools::timeNow().data());
 	}
+
 }
 
 Packet* GatewaySender::pull(int port) {

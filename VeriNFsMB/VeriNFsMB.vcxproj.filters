@@ -33,14 +33,23 @@
     <None Include="click_config\gateway1.click">
       <Filter>click</Filter>
     </None>
-    <None Include="click_config\gateway2.click">
-      <Filter>click</Filter>
-    </None>
     <None Include="click_config\gatewayr.click">
       <Filter>click</Filter>
     </None>
     <None Include="src\libverimb\Makefile">
       <Filter>lib</Filter>
+    </None>
+    <None Include="click_config\localfw.click">
+      <Filter>click</Filter>
+    </None>
+    <None Include="click_config\localids.click">
+      <Filter>click</Filter>
+    </None>
+    <None Include="click_config\locallb.click">
+      <Filter>click</Filter>
+    </None>
+    <None Include="click_config\localgateway1.click">
+      <Filter>click</Filter>
     </None>
   </ItemGroup>
   <ItemGroup>

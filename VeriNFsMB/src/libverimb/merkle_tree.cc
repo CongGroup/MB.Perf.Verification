@@ -27,6 +27,8 @@ MerkleTree::MerkleTree(const uint32_t height_input, const std::vector<std::strin
 
 void MerkleTree::buildtree(const uint32_t height, const std::vector<std::string>& data)
 {
+	int hashCount = 0;
+
 	//malloc tree space
 	const int treeNodeCount = (1 << height) - 1;
 	root = new TreeNode[treeNodeCount];
@@ -54,9 +56,12 @@ void MerkleTree::buildtree(const uint32_t height, const std::vector<std::string>
 			string value(root[(baseIndex + i) * 2].hashValue);
 			value.append(root[(baseIndex + i) * 2 + 1].hashValue);
 			leavesLayer->hashValue.assign(encTools::SHA256(value));
+			hashCount += 1;
 		}
 		currentLayer -= 1;
 	}
+	//click_chatter("tree height is %d, tree node is %d", height, hashCount);
+	
 }
 
 string MerkleTree::getRoot()

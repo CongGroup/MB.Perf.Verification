@@ -115,14 +115,16 @@ Binary PatternLoader::ptrn_str_to_bytes(const std::string & str) {
     size_t strlen = str.length();
     for (size_t i = 0; i < strlen; ) {
         // handle binary data in hex form
-        if (str[i] == '|') {
+        if (str[i] == '|') 
+		{
             // find next '|' and extract the hex string
             size_t nextDelim = str.find('|', i + 1);
             const std::string& hexes = str.substr(i + 1, nextDelim - i - 1);
 
             // transform each char
             size_t idx = 0;
-            while (idx < hexes.length()) {
+            while (idx < hexes.length()) 
+			{
                 if (hexes[idx] == ' ') {
                     ++idx;
                     continue;
@@ -135,7 +137,8 @@ Binary PatternLoader::ptrn_str_to_bytes(const std::string & str) {
             i = nextDelim + 1;
         }
         // normal character
-        else {
+        else 
+		{
             bytes.push_back(str[i]);
             ++i;
         }

@@ -28,8 +28,8 @@ public:
 
 	static bool isTestPacket(Packet* p);
 	static void showPacket(Packet* p);
-	static uint64_t getPktID(uint32_t flowID, uint32_t cNum);
-	static std::tuple<uint32_t, uint32_t> divideID(uint64_t pktID);
+	static uint32_t getPktID(uint16_t flowID, uint16_t cNum);
+	static std::tuple<uint16_t, uint16_t> divideID(uint32_t pktID);
 	static WritablePacket* reDirectionPacket(WritablePacket* pkt_in, const char* srcIP, const char* srcMac, const char* dstIP, const char* dstMac);
 	static Packet* mkDummpPacket(Packet* pkt_in);
 	static std::string fiveTuple(Packet* pkt_in);
@@ -55,18 +55,22 @@ public:
 
 	static bool buildVeriTree(boxBatch& batch);
 	static WritablePacket* makeUDPPacket();
-
-
+	
+	//static void genPackets(char* fileName, int pktCount, int flowSize, int pageloadSize);
+	
 	// return new 32bit ip
 	static uint32_t processLB(Packet* p_in);
-	static std::string fpktLB(Packet* p_in, veriInfo& veri);
-	static std::string fflowLB (pktFlow& flow, veriInfo&veri);
-	static std::string fflowFW (pktFlow& flow, veriInfo& veri );
-	static std::string fflowIDS(pktFlow& flow, veriInfo& veri);
+	static uint64_t updateFlowVeri(veriInfo& flow_veri, const veriInfoPkt& pktVeriResult, Packet* p_in);
+
+	static uint64_t fflowLB (Packet* p_in);
+	static uint64_t fflowFW (Packet* p_in);
+	static uint64_t fflowIDS(Packet* p_in);
 
 	static std::string setPktCounter(pktCounter& counter, Packet* p_ref);
 	static std::string formatPktCounter(const pktCounter& counter);
 	static std::string formatElementCounter(const elementCounter& counter);
+
+	static int getVeriRandom(Packet* p_in);
 
 	static void checkElementCounter(elementCounter & counter, std::string & preTime, std::vector<std::string>& eleContainer);
 };

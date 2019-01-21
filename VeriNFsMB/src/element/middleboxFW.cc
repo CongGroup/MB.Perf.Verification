@@ -17,15 +17,55 @@ MiddleboxFW::MiddleboxFW()
 {
 }
 
+
+static bool veriSwitch = true;
+static bool justSend = false;
+static bool localMode = false;
+static bool bothway = false;
+static int  batch_element_size = 1024;
+static int  maxPktUsed = 1024 * 10 * 10 + 200;
+static bool lbInTheChain = false;
+static bool fwInTheChain = false;
+static bool idsInTheChain = false;
+
 int
-MiddleboxFW::configure(Vector<String> &conf, ErrorHandler* errh) {
+MiddleboxFW::configure(Vector<String> &conf, ErrorHandler* errh)
+{
+
+	//if (Args(conf, errh)
+	//	.complete() < 0)
+	//{
+	//	return -1;
+	//}
 	// Parsing
+	int inChain;
 	if (Args(conf, errh)
-		//.read_m("BATCH_SIZE", isFirstBox)
+		//.read_m("PATTERN_FILE", m_config.pattern_file)
+		.read_m("BATCH_SIZE", batch_element_size)
+		.read_m("EXP_SIZE", maxPktUsed)
+		.read_m("VERIFY", veriSwitch)
+		.read_m("DISABLE_NETWORK", localMode)
+		.read_m("BASELINE", justSend)
+		.read_m("QUEYR_TABLE", bothway)
+		.read_m("IN_CHAIN", inChain)
 		.complete() < 0)
 	{
 		return -1;
 	}
+
+	if (inChain)
+	{
+		lbInTheChain = true;
+		fwInTheChain = true;
+		idsInTheChain = true;
+	}
+	else
+	{
+		lbInTheChain = false;
+		fwInTheChain = false;
+		idsInTheChain = false;
+	}
+
 	return 0;
 }
 
@@ -33,15 +73,17 @@ int MiddleboxFW::initialize(ErrorHandler *errh)
 {
 	click_chatter("===============================================\n");
 	click_chatter("Batch size\t:\t%d\n", batch_element_size);
-	click_chatter("Test use pkt\t:\t%d\n", maxPktUsed);
+	click_chatter("Packets count\t:\t%d\n", maxPktUsed);
+
 	click_chatter("Baseline test is %s\n", justSend ? "enable" : "disable");
 	click_chatter("Veri function is %s\n", veriSwitch ? "enable" : "disable");
-	click_chatter("Veri type     is %s\n", batchBasedPkt ? "pktBased" : "flowBased");
+	click_chatter("Local test is %s\n", localMode ? "enable" : "disable");
+	click_chatter("Query Table is %s\n", bothway ? "enable" : "disable");
+	click_chatter("Box in chain is %s\n", lbInTheChain ? "yes" : "no");
 
-	click_chatter("pktBased  LB  is %s\n", samplePktLB ? "enable" : "disable");
-	click_chatter("flowBased LB  is %s\n", sampleLB ? "enable" : "disable");
-	click_chatter("flowBased FW  is %s\n", sampleFW ? "enable" : "disable");
-	click_chatter("flowBased IDS is %s\n", sampleIDS ? "enable" : "disable");
+	//click_chatter("flowBased LB  is %s\n", sampleLB ? "enable" : "disable");
+	//click_chatter("flowBased FW  is %s\n", sampleFW ? "enable" : "disable");
+	//click_chatter("flowBased IDS is %s\n", sampleIDS ? "enable" : "disable");
 	click_chatter("===============================================\n");
 	std::string start = encTools::timeNow();
 	click_chatter("===============================================\n");
@@ -57,7 +99,6 @@ int MiddleboxFW::initialize(ErrorHandler *errh)
 
 	preTime = encTools::timeNow();
 	activityTime = encTools::timeNow();
-	startTime = encTools::timeNow();
 
 	PatternLoader::load_firewall_file(firewallFilePath,rules);
 	click_chatter("Load %d filewall rules.\n", rules.size());
@@ -68,7 +109,7 @@ int MiddleboxFW::initialize(ErrorHandler *errh)
 
 void MiddleboxFW::push(int port, Packet * p_in)
 {
-	if (localMode&& validTotalPkgCount > maxPktUsed)
+	if (localMode&& validTotalPkgCount >= maxPktUsed - 10)
 	{
 		for (auto it = pktContainer.begin(); it != pktContainer.end(); ++it)
 		{
@@ -150,8 +191,8 @@ void MiddleboxFW::push(int port, Packet * p_in)
 	if (batch.packetCount == 0)
 	{
 		//########################  different in each box
-		VeriTools::initBoxBatch(batch, pveri->batchID, batchBasedPkt ? pktBasedVerify : flowBasedVerify, FW);
-		batch.readyToSendRoot = batchBasedPkt;
+		VeriTools::initBoxBatch(batch, pveri->batchID, flowBasedVerify, FW);
+		batch.readyToSendRoot = false;
 	}
 
 	WritablePacket *p = 0;
@@ -160,6 +201,7 @@ void MiddleboxFW::push(int port, Packet * p_in)
 	if (pveri->flowID == trickFlowID)
 	{
 		batch.batchPktSize = pveri->cNum;
+		if (!fwInTheChain)
 		batch.readyToSendRoot = true;
 		if (verbose)
 		click_chatter("Recv batch size pkt, batchID:%d, size:%d\n", pveri->batchID, pveri->cNum);
@@ -170,7 +212,8 @@ void MiddleboxFW::push(int port, Packet * p_in)
 	}
 	else if (pveri->flowID == merkletreeRootFlowID)
 	{
-		//batch.readyToSendRoot = true;
+		if (fwInTheChain)
+		batch.readyToSendRoot = true;
 		memcpy(batch.rootPacket, p_in->data(), p_in->length());
 		if(verbose)
 		click_chatter("Recv merkle_tree root pkt, tree root count is %d.\n", ((VeriHeader*)(reader.getIpOption()))->cNum);
@@ -215,19 +258,16 @@ void MiddleboxFW::push(int port, Packet * p_in)
 
 		// 5. update veriInfo
 		//########################  different in each 
-		if (veriSwitch&& sampleFW)
+		if (veriSwitch)
 		{
 			veriInfo& veri = batch.veriRes[flow.flowID];
-			if (veri.packetCount == 0)
-			{
-				veri.typeV = flowBasedVerify;
-				veri.typeB = FW;
-				veri.field = 4;
-				veri.ruleID = 0;
-			}
-			veri.packetCount += 1;
+			VeriTools::updateFlowVeri(veri, VeriTools::fflowFW(p), p);
 		}
 		activityTime = encTools::timeNow();
+		if (!startTime.size())
+		{
+			startTime = activityTime;
+		}
 		boxPktCounter.timestamp = encTools::differTimeInNsec(startTime.data(), activityTime.data());
 		startTime = activityTime;
 		boxPktCounter.processTime = encTools::differTimeInNsec(beginTime.data(), activityTime.data());
@@ -268,12 +308,6 @@ void MiddleboxFW::push(int port, Packet * p_in)
 				{
 					click_chatter("batch flowCount error %d\n", batch.flows.size());
 					return;
-				}
-
-				//########################  different in each 
-				for (auto iterRes = batch.veriRes.begin(); iterRes != batch.veriRes.end(); iterRes++)
-				{
-					VeriTools::fflowFW(batch.flows[(uint32_t)iterRes->first], iterRes->second);
 				}
 				buildTreeAndSendRootPkt(batch);
 			}

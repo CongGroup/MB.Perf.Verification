@@ -16,30 +16,93 @@ MiddleboxIDS::MiddleboxIDS()
 {
 }
 
+
+static bool veriSwitch = true;
+static bool justSend = false;
+static bool localMode = false;
+static bool bothway = false;
+static int  batch_element_size = 1024;
+static int  maxPktUsed = 1024 * 10 * 10 + 200;
+static bool lbInTheChain = false;
+static bool fwInTheChain = false;
+static bool idsInTheChain = false;
+
 int
-MiddleboxIDS::configure(Vector<String> &conf, ErrorHandler* errh) {
+MiddleboxIDS::configure(Vector<String> &conf, ErrorHandler* errh)
+{
+
+	//if (Args(conf, errh)
+	//	.complete() < 0)
+	//{
+	//	return -1;
+	//}
 	// Parsing
+	int inChain;
 	if (Args(conf, errh)
-		//.read_m("BATCH_SIZE", isFirstBox)
+		//.read_m("PATTERN_FILE", m_config.pattern_file)
+		.read_m("BATCH_SIZE", batch_element_size)
+		.read_m("EXP_SIZE", maxPktUsed)
+		.read_m("VERIFY", veriSwitch)
+		.read_m("DISABLE_NETWORK", localMode)
+		.read_m("BASELINE", justSend)
+		.read_m("QUEYR_TABLE", bothway)
+		.read_m("IN_CHAIN", inChain)
 		.complete() < 0)
 	{
 		return -1;
 	}
+
+	if (inChain)
+	{
+		lbInTheChain = true;
+		fwInTheChain = true;
+		idsInTheChain = true;
+	}
+	else
+	{
+		lbInTheChain = false;
+		fwInTheChain = false;
+		idsInTheChain = false;
+	}
+
 	return 0;
 }
 
 int MiddleboxIDS::initialize(ErrorHandler *errh)
 {
+	//char strBuffer[2000];
+	//// test sha256
+	//const int num[] = {6, 200, 400, 600, 800, 1000, 1200};
+
+	//for (int k = 0; k < sizeof(num) / sizeof(int); k++)
+	//{
+	//	std::string start = encTools::timeNow();
+	//	for (int i = 0; i < 10000; i++)
+	//	{
+	//		string str;
+	//		str.assign(strBuffer, num[k]);
+	//		std::string res = encTools::SHA256(str);
+	//	}
+	//	std::string end = encTools::timeNow();
+	//	double t = encTools::differTimeInNsec(start.data(), end.data());
+
+	//	click_chatter("SHA %d  B data need %lf ns.\n", num[k], t);
+	//}
+	//click_chatter("\n\n\n\n");
+
 	click_chatter("===============================================\n");
 	click_chatter("Batch size\t:\t%d\n", batch_element_size);
+	click_chatter("Packets count\t:\t%d\n", maxPktUsed);
+
 	click_chatter("Baseline test is %s\n", justSend ? "enable" : "disable");
 	click_chatter("Veri function is %s\n", veriSwitch ? "enable" : "disable");
-	click_chatter("Veri type     is %s\n", batchBasedPkt ? "pktBased" : "flowBased");
+	click_chatter("Local test is %s\n", localMode ? "enable" : "disable");
+	click_chatter("Query Table is %s\n", bothway ? "enable" : "disable");
+	click_chatter("Box in chain is %s\n", lbInTheChain ? "yes" : "no");
 
-	click_chatter("pktBased  LB  is %s\n", samplePktLB ? "enable" : "disable");
-	click_chatter("flowBased LB  is %s\n", sampleLB ? "enable" : "disable");
-	click_chatter("flowBased FW  is %s\n", sampleFW ? "enable" : "disable");
-	click_chatter("flowBased IDS is %s\n", sampleIDS ? "enable" : "disable");
+	//click_chatter("flowBased LB  is %s\n", sampleLB ? "enable" : "disable");
+	//click_chatter("flowBased FW  is %s\n", sampleFW ? "enable" : "disable");
+	//click_chatter("flowBased IDS is %s\n", sampleIDS ? "enable" : "disable");
 	click_chatter("===============================================\n");
 	std::string start = encTools::timeNow();
 	click_chatter("===============================================\n");
@@ -59,13 +122,13 @@ int MiddleboxIDS::initialize(ErrorHandler *errh)
 	boxTotalTime = 0;
 	preTime = encTools::timeNow();
 	activityTime = encTools::timeNow();
-	startTime = encTools::timeNow();
+
 	return 0;
 }
 
 void MiddleboxIDS::push(int port, Packet * p_in)
 {
-	if (localMode&& validTotalPkgCount > maxPktUsed)
+	if (localMode&& validTotalPkgCount >= maxPktUsed - 10)
 	{
 		for (auto it = pktContainer.begin(); it != pktContainer.end(); ++it)
 		{
@@ -147,8 +210,8 @@ void MiddleboxIDS::push(int port, Packet * p_in)
 	if (batch.packetCount == 0)
 	{
 		//########################  different in each box
-		VeriTools::initBoxBatch(batch, pveri->batchID, batchBasedPkt ? pktBasedVerify : flowBasedVerify, IDS);
-		batch.readyToSendRoot = batchBasedPkt;
+		VeriTools::initBoxBatch(batch, pveri->batchID, flowBasedVerify, IDS);
+		batch.readyToSendRoot = false;
 	}
 
 	WritablePacket *p = 0;
@@ -157,7 +220,8 @@ void MiddleboxIDS::push(int port, Packet * p_in)
 	if (pveri->flowID == trickFlowID)
 	{
 		batch.batchPktSize = pveri->cNum;
-		//batch.readyToSendRoot = true;
+		if (!idsInTheChain)
+		batch.readyToSendRoot = true;
 		if (verbose)
 		click_chatter("Recv batch size pkt, batchID:%d, size:%d\n", pveri->batchID, pveri->cNum);
 
@@ -167,6 +231,7 @@ void MiddleboxIDS::push(int port, Packet * p_in)
 	}
 	else if (pveri->flowID == merkletreeRootFlowID)
 	{
+		if (idsInTheChain)
 		batch.readyToSendRoot = true;
 		memcpy(batch.rootPacket, p_in->data(), p_in->length());
 		if(verbose)
@@ -204,22 +269,17 @@ void MiddleboxIDS::push(int port, Packet * p_in)
 		//VeriTools::showPacket(p);
 
 		// 5. update veriInfo
-		if (veriSwitch&& sampleIDS)
+		if (veriSwitch)
 		{
 			veriInfo& veri = batch.veriRes[flow.flowID];
-			if (veri.packetCount == 0)
-			{
-				veri.flowID = flow.flowID;
-				veri.typeV = flowBasedVerify;
-				veri.typeB = IDS;
-				veri.field = 7;
-				veri.ruleID = 0;
-			}
-			veri.packetCount += 1;
-			veri.pageLoadLength += reader.getDataLength();
+			VeriTools::updateFlowVeri(veri, VeriTools::fflowIDS(p), p);
 		}
 
 		activityTime = encTools::timeNow();
+		if (!startTime.size())
+		{
+			startTime = activityTime;
+		}
 		boxPktCounter.timestamp = encTools::differTimeInNsec(startTime.data(), activityTime.data());
 		startTime = activityTime;
 		boxPktCounter.processTime = encTools::differTimeInNsec(beginTime.data(), activityTime.data());
@@ -259,11 +319,6 @@ void MiddleboxIDS::push(int port, Packet * p_in)
 					{
 						click_chatter("batch flowCount error %d\n", batch.flows.size());
 						return;
-					}
-
-					for (auto iterRes = batch.veriRes.begin(); iterRes != batch.veriRes.end(); iterRes++)
-					{
-						VeriTools::fflowIDS(batch.flows[(uint32_t)iterRes->first], iterRes->second);
 					}
 					buildTreeAndSendRootPkt(batch);
 				}

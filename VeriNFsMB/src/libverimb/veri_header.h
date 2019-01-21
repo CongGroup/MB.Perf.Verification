@@ -106,31 +106,25 @@ enum boxType
 	IDS
 };
 
+struct veriInfoPkt_t
+{
+	uint32_t pktID;
+	uint16_t fieldID;
+	uint16_t ruleID;
+};
+
+union veriInfoPkt
+{
+	veriInfoPkt(uint64_t num = 0) { veriNum = num; }
+	veriInfoPkt_t veriData;
+	uint64_t veriNum;
+};
+
 struct veriInfo
 {
-	veriInfo()
-	{
-		pktID = flowID = ruleID = state = packetCount = pageLoadLength = field = 0;
-	}
-	
-	veriType typeV;
-	boxType typeB;
-
-	uint64_t pktID;
-
-	uint8_t field;
-	uint32_t ruleID;
-
-	uint32_t flowID;
-	uint32_t state;
-
-	uint32_t packetCount;
-	uint32_t pageLoadLength;
-
-	std::string mateData;
-	std::string veriOutput;
-	std::string veriRes;
-
+	veriInfo():pktCount(0), veriRes(0){}
+	int pktCount;
+	veriInfoPkt veriRes;
 };
 
 //struct batchCounter
@@ -258,6 +252,7 @@ class encTools
 public:
 	static const int SHA256_len = 32;
 
+	static std::string SHA256(uint8_t* data, int len);
 	static std::string SHA256(const std::string& data);
 
 	// return a string saved timespec
